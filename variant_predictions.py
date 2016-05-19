@@ -1,8 +1,10 @@
 from urllib2 import Request, urlopen, URLError
 import ast
+import json
 import argparse
 from argparse import RawTextHelpFormatter
 import os
+from biomart import BiomartServer
 
 # http://genetics.bwh.harvard.edu/pph2/dokuwiki/_media/hg0720.pdf - polyphen-2 api info
 '''
@@ -64,11 +66,45 @@ def get_result(chr, coord, wt, var):
 # get_result(args.chr, args.pos, args.wt, args.var)
 
 
-def get_coords(base_position):
-    transcript = "ENST00000288602"
-    webpage = urlopen("http://rest.ensembl.org/map/cdna/%s/%s?content-type=application/json" %
-                      (transcript, base_position))
-    response = webpage.read()
-    print response
+def get_gene_info(gene):
+    """Takes a gene and uses Ensembl API (GET xrefs/symbol/:species/:symbol) to extract ENSG and LRG codes.
 
-get_coords(100)
+    :param gene: gene to be searched for.
+    :return: ENSG and LRG codes.
+    """
+    webpage = urlopen("http://rest.ensembl.org/xrefs/symbol/homo_sapiens/%s?content-type=application/json" % gene)
+    result = webpage.read()
+    jdata = json.loads(result)
+    gene_list = []
+    for item in jdata:
+        for key, value in item.iteritems():
+            if key == "id":
+                gene_list.append(value)
+    ensg = gene_list[0]
+    lrg = gene_list[1]
+    return ensg, lrg
+
+
+def get_transcript(ensg, refseq):
+    server = BiomartServer("http://www.ensembl.org/biomart")
+    server.verbose = True
+    new_list = []
+    hs_genes = server.datasets['hsapiens_gene_ensembl']
+    results = hs_genes.search({
+        'filters': {'ensembl_gene_id': '%s' % ensg,
+                    'refseq_mrna': '%s' % refseq},
+        'attributes': ['ensembl_transcript_id', 'ensembl_peptide_id']
+    }, header=1)
+    for line in results.iter_lines():
+        line = line.decode('utf-8')
+        new_list.append(line.split())
+    uni_transcript = new_list[1]
+    transcript = uni_transcript[0]
+    protein = uni_transcript[1]
+    return transcript, protein
+
+
+refseq = "NM_000059"
+ensg, lrg = get_gene_info("BRCA2")  # example, use parser
+get_transcript(ensg, refseq)
+

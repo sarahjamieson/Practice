@@ -1,0 +1,6 @@
+Predictor	Prediction	Rank	Score
+Mutation Assessor			
+Mutation Taster			
+PolyPhen-2 HumDiv			
+PolyPhen-2 HumVar			
+SIFT			
